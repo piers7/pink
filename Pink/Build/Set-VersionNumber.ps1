@@ -1,3 +1,13 @@
+<#
+.Synopsis
+Stamps the version number into the input files suppled on the pipeline.
+The version number is stamped in in different ways depending on the file type
+(wix, nuspec, assemblyinfo etc...)
+Since System.Version can't handle wildcards, no validation on the version string
+is performed. It is your responsibility to provide a valid version string for the file types provided.
+Read-only files are ignored, unless force is specified.
+If operating under TFS, check the files out first
+#>
 param(
     [Parameter(Mandatory=$true)] [string]
     $version,
@@ -5,53 +15,53 @@ param(
     [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
     [IO.FileInfo[]] $files,
 
-    [switch] $checkout
+    [switch] $force # if set, version numbers will be set in read-only files. For TFS, checkout first instead of this
 )
 
-# This script updates the version numbers in AssemblyVersionInfo.cs and all install projects within the solution
-# Files are checked out first, unless nocheckout is specified
 $programFiles32 = $env:ProgramFiles
 if (test-path environment::"ProgramFiles(x86)") { $programFiles32 = (gi "Env:ProgramFiles(x86)").Value };
 
 $erroractionpreference = "stop";
 $scriptDir = split-path $myinvocation.MyCommand.Path
 
-$tf = "$ProgramFiles32\Microsoft Visual Studio 10.0\Common7\IDE\TF.exe";
-
-function Checkout($files){
-  if ($checkout){
-    & $tf checkout $files
-  }
+function EnsureWritable([fileinfo]$file){
+    if(!$file.IsReadOnly) { return $true; }
+    if($force){
+        $file.IsReadOnly = $false;
+        return $true;
+    }else{
+        write-warning "Skipping $file as write protected";
+        return $false;
+    }
 }
 
 # .Synopsis
 # Sets the version number within an assemblyinfo file
 function Set-AssemblyInfoVersion($file, $version)
 {
-   # Stamp the version number back into the assembly info file
-   if (!(test-path $file -PathType leaf))
-   {
-        write-warning "File not found, skipping version update. $file";
-   }
-   else
-   {
-     Checkout $file
-     $contents = gc $file | ? { -not ($_ -match 'Version\(') }
-     $contents += '[assembly: AssemblyVersion("{0}")]' -f $version;
-     $contents += '[assembly: AssemblyFileVersion("{0}")]' -f ($version.Replace('*','0'))
-     $contents | out-file $file -Encoding:ASCII
-   }
+    if(!(EnsureWritable $file)){ return;}
+    
+    write-verbose "Set version number in $file"
+    $contents = gc $file | ? { -not ($_ -match 'Version\(') }
+    $contents += '[assembly: AssemblyVersion("{0}")]' -f $version;
+    $contents += '[assembly: AssemblyFileVersion("{0}")]' -f ($version.Replace('*','0'))
+    $contents | out-file $file -Encoding:ASCII
+    
+    # Revert afterwards? Seems like this might just cause even more problems with TFS
+    # if($wasReadOnly){ $file.IsReadOnly = $true; }
 }
 
 function ProcessItem($file, [scriptblock] $exec){
+    if(!(EnsureWritable $file)){ return;}
+
     write-verbose "Set version number in $file"
-    checkout $file;
     & $exec;
 }
 
 function ProcessXmlItem($file, [scriptblock] $exec){
+    if(!(EnsureWritable $file)){ return;}
+    
     write-verbose "Set version number in $file"
-    checkout $file;
     $xml = new-object system.xml.xmldocument
     $xml.Load($file.FullName);
     & $exec $xml;
@@ -60,6 +70,7 @@ function ProcessXmlItem($file, [scriptblock] $exec){
 
 # Loop over all the files specified
 foreach($file in $files){
+    if(!$file.Exists) { continue; }
     switch($file.Extension){
         ".nuspec" {
             ProcessXmlItem $file {
