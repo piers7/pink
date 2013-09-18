@@ -1,7 +1,8 @@
 [CmdLetBinding()]
 param(
     $PackageStoreName = 'LocalNugetPackageStore',
-    [switch]$updateVersion
+    [switch]$updateVersion,
+    [switch]$inTeamCity = $(![String]::IsNullOrEmpty($env:TEAMCITY_VERSION))
 )
 
 $ErrorActionPreference = 'stop';
@@ -21,12 +22,23 @@ if(!(Test-Path $outDir)){
     $void = mkdir $outDir;
 }
 nuget.exe pack Package\Pink.nuspec -outputdirectory $outDir
+if(!$?){ exit $LASTEXITCODE }
 
 $msbuild = .\Scripts\Get-MsBuildPath.ps1
 dir $scriptDir\Samples *.sln -Recurse | % { 
     & $msbuild $_.FullName;
+    if(!$?){ exit $LASTEXITCODE }
 }
 
+}catch{
+    if($inTeamCity){
+        write-warning $_;
+        if($_.Exception){
+            write-warning $_.Exception.GetBaseException().Message;
+        }
+        exit 1;
+    }
+}
 }finally{
-popd;
+    popd;
 }
