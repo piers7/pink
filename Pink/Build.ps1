@@ -38,7 +38,6 @@ dir $scriptDir\Samples *.sln -Recurse | % {
         }
         exit 1;
     }
-}
 }finally{
     popd;
 }
