@@ -6,7 +6,8 @@ param(
     $dataSourcePath = $targetPath,
     $dataSetPath = $targetPath,
     [hashtable] $connectionStrings,
-    [scriptblock] $routingRules
+    [scriptblock] $routingRules,
+    [switch] $force
 )
 
 $ErrorActionPreference = 'stop';
@@ -193,7 +194,6 @@ try{
     $dataSourceItems = @($reportProject.Project.DataSources.ProjectItem | SelectNameAndFullPath);
     foreach($projectItem in $dataSourceItems){
         $name = $projectItem.Name
-
         $datasourceFile = New-Object System.Xml.XmlDocument;
         $datasourceFile.Load($projectItem.FullName);
         $datasource = $datasourceFile.RptDataSource.ConnectionProperties;
@@ -208,21 +208,41 @@ try{
             }
         }
 
-        if ($itemExists){
-            Write-Verbose "Skipping uploading datasource $name as already present";
+        if ($itemExists -and -not $force){
+	        Write-Host ("`t ... {0} (skipped, already present)" -f $projectItem.Name);
         }else{
+	        Write-Host ("`t ... {0}" -f $projectItem.Name);
             $emptyArgs = [object[]]@();
             $dataSourceDefn = [Activator]::CreateInstance($dataSourceType, $emptyArgs); # new-object SSRSProxies.ReportService2010.DataSourceDefinition;
+            
+            # Take some data source properties from the data source as defined within the SSRS project
+            $dataSourceDefn.Extension = $datasource.Extension;
+
+            # Set other properties (or overwrite the above) based on the $connectionStrings hashtable-of-hashtables
             if($connectionStrings -and $connectionStrings.ContainsKey($name)){
-                $dataSourceDefn.ConnectString = $connectionStrings[$name];
+                $connectionDetails = $connectionStrings[$name];
+                $dataSourceDefn.ConnectString = $connectionDetails.ConnectionString;
+
+                # Splat any remaining items in the hashtable onto properties of the datasource definition object
+                foreach($propName in $connectionDetails.Keys | ? { $_ -ne 'ConnectionString' }){
+                    $dataSourceDefn.$propName = $connectionDetails.$propName;
+                }
+
             }else{
                 Write-Warning "Unable to process connectionstring for $name"
                 $dataSourceDefn.ConnectString = '';
             }
-            $dataSourceDefn.Extension = $datasource.Extension;
-            if ($datasource.IntegratedSecurity -eq "true"){
+
+            # Credential retrieval defaults to 'prompt'
+            # If we specified a username/password, that should be used instead
+            if($dataSourceDefn.UserName){
+                $dataSourceDefn.CredentialRetrieval = 'Store';
+
+            # otherwise, if the project was using integated security, use that
+            }elseif($datasource.IntegratedSecurity -eq "true"){
                 $dataSourceDefn.CredentialRetrieval = "Integrated";
             }
+
             Write-Verbose "Creating datasource $name";
             [void] ($rs.CreateDataSource($name, $dataSourcePath, $false, $dataSourceDefn, $null));
         }
@@ -238,8 +258,12 @@ try{
         # Doesn't seem to be any easy way of interrogating the DataSource references from the deployed DataSet
         # (get the references, but not the original DataSource name :-(
         # so...
+        $dataSetXml = Load-Xml $projectItem.FullName;
+        $ns = @{
+            sds = $dataSetXml.DocumentElement.NamespaceURI;
+        }
         $dataSourceName = (
-            Select-Xml -Path:$projectItem.FullName -XPath:'//sds:DataSet/sds:Query/sds:DataSourceReference' -Namespace:$ssrsNs | Select-Object -First:1
+            Select-Xml -Path:$projectItem.FullName -XPath:'//sds:DataSet/sds:Query/sds:DataSourceReference' -Namespace:$ns | Select-Object -First:1
             ).Node.'#text';
 
         SetDataSources $catalogItem $dataSourcePath $dataSourceName;
@@ -272,12 +296,18 @@ try{
         Write-Host ("`t ... {0}" -f $projectItem.Name);
         $catalogItem = CreateCatalogItemFromFile 'Report' $projectItem.Name $reportDestination $projectItem.FullName @{}
 
+        # Work out namespace (different between 2008, 2012 etc...
+        $reportXml = Load-Xml $projectItem.FullName;
+        $ns = @{
+            rdl = $reportXml.DocumentElement.NamespaceURI;
+        }
+
         # Pull out reference usage for shared Data Set / Data Sources from the RDL
-        $sharedDataSourceLookup = Select-Xml -path:$projectItem.FullName -XPath:'//rdl:DataSource[rdl:DataSourceReference]' -Namespace:$ssrsNs | 
+        $sharedDataSourceLookup = Select-Xml -path:$projectItem.FullName -XPath:'//rdl:DataSource[rdl:DataSourceReference]' -Namespace:$ns | 
             Select-Object -ExpandProperty:Node |
             To-Hashtable -Name:{$_.Name} -Value:{$_.DataSourceReference};
 
-        $sharedDataSetLookup = Select-Xml -path:$projectItem.FullName -XPath:'//rdl:DataSet[rdl:SharedDataSet]' -Namespace:$ssrsNs | 
+        $sharedDataSetLookup = Select-Xml -path:$projectItem.FullName -XPath:'//rdl:DataSet[rdl:SharedDataSet]' -Namespace:$ns | 
             Select-Object -ExpandProperty:Node |
             To-Hashtable -Name:{$_.Name} -Value:{$_.SharedDataSet.SharedDataSetReference};
             
