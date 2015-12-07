@@ -12,6 +12,9 @@ param(
     [Parameter(Mandatory=$true)] [string]
     $version,
 
+    $fileVersion = $version,
+    $informationalVersion = $version,
+
     [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
     [IO.FileInfo[]] $files,
 
@@ -24,7 +27,7 @@ if (test-path environment::"ProgramFiles(x86)") { $programFiles32 = (gi "Env:Pro
 $erroractionpreference = "stop";
 $scriptDir = split-path $myinvocation.MyCommand.Path
 
-function EnsureWritable([fileinfo]$file){
+function EnsureWritable([io.fileinfo]$file){
     if(!$file.IsReadOnly) { return $true; }
     if($force){
         $file.IsReadOnly = $false;
@@ -44,7 +47,8 @@ function Set-AssemblyInfoVersion($file, $version)
     write-verbose "Set version number in $file"
     $contents = gc $file | ? { -not ($_ -match 'Version\(') }
     $contents += '[assembly: AssemblyVersion("{0}")]' -f $version;
-    $contents += '[assembly: AssemblyFileVersion("{0}")]' -f ($version.Replace('*','0'))
+    $contents += '[assembly: AssemblyFileVersion("{0}")]' -f ($fileVersion.Replace('*','0'));
+    $contents += '[assembly: AssemblyInformationalVersion("{0}")]' -f $semVer;
     $contents | out-file $file -Encoding:ASCII
     
     # Revert afterwards? Seems like this might just cause even more problems with TFS
@@ -87,7 +91,7 @@ foreach($file in $files){
             break;    
         }
         default {
-            if($file.Name -match 'AssemblyInfo.cs'){
+            if($file.Name -like 'Assembly*Info.cs'){
                 ProcessItem $file {
                     Set-AssemblyInfoVersion $file $version;
                 }
