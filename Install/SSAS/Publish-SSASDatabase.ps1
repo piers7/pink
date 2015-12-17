@@ -20,6 +20,7 @@ param(
     $sqlVersion = 110,
     $version,
     $description,
+    $process,
     [switch] $clean,
     [switch] $whatif
 )
@@ -45,6 +46,23 @@ $deploymentOptions = [IO.Path]::ChangeExtension($asdatabase, '.deploymentOptions
 $programFiles32 = $env:ProgramFiles
 if (test-path environment::"ProgramFiles(x86)") { $programFiles32 = (gi "Env:ProgramFiles(x86)").Value };
 $asDeploy = Resolve-Path "$programfiles32\Microsoft SQL Server\$sqlVersion\Tools\Binn\ManagementStudio\Microsoft.AnalysisServices.Deployment.exe"
+
+<#
+.synopsis
+Connects to an Analysis Services server using AMO
+#>
+[CmdLetBinding]
+function Get-SSASServer {
+    param(
+        [Parameter(Mandatory=$true)] $serverInstance
+    )
+
+    Add-Type -AssemblyName:"Microsoft.AnalysisServices, Version=11.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91";
+    $srv = New-Object Microsoft.AnalysisServices.Server
+    $srv.Connect($serverInstance)
+    $srv
+}
+
 
 function GenerateDeploymentXmla($asdatabase, $xmlaPath, $databaseName){
     if(Test-Path $xmlaPath) { Remove-Item $xmlaPath; }
@@ -112,7 +130,7 @@ try{
     GenerateDeploymentXmla $asdatabase $xmla -databaseName:$databaseName;
 
     Write-Verbose "Determine if $databaseName already exists on $server"
-    $amoServer = .\Get-SSASServer.ps1 $server;
+    $amoServer = Get-SSASServer $server;
     $existing = $amoServer.Databases.FindByName($databaseName); # nb: not AMO 2005 compatable
     if($existing){
 	    if($clean){
@@ -172,6 +190,18 @@ try{
     
     Write-Verbose "Commit final updates";
     $db.Update();
+
+    if($process){
+        Write-Host "Processing as $process";
+        try{
+            $db.Process($process);
+        }catch [Microsoft.AnalysisServices.AmoException] {
+            $failed = $true;
+            foreach($message in ($_.Exception.Results | Select-Object -ExpandProperty:Messages)){
+                Write-Warning $message.Description;
+            }
+        }
+    }
 
     Write-Host "Done";
 

@@ -1,4 +1,4 @@
-Add-Type -AssemblyName:Microsoft.AnalysisServices
+Add-Type -AssemblyName:"Microsoft.AnalysisServices, Version=11.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91";
 
 <#
 .synopsis
@@ -137,7 +137,7 @@ function Invoke-SSASProcessObject {
         [string]$cubeName,
         [string]$process = 'ProcessFull',
         [switch]$ignoreErrors,
-        [switch]$robust,
+        # [switch]$robust,
         [switch]$whatif
     )
 
@@ -151,6 +151,7 @@ function Invoke-SSASProcessObject {
         $db = Get-SSASDatabase $serverInstance $database;
         if($cubeName){
             $objectsToProcess += $db.Cubes.GetByName($cubeName);
+        <#
         }elseif($robust){
             Write-Verbose "Using object-by-object (robust) processing";
             $objectsToProcess += $db.Dimensions;
@@ -158,6 +159,7 @@ function Invoke-SSASProcessObject {
                 $objectsToProcess += $cube.MeasureGroups;
             }
             $objectsToProcess += $cube;
+        #>
         }else{
             Write-Verbose "Processing entire SSAS database";
             $objectsToProcess += $db;
