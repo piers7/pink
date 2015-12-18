@@ -7,6 +7,7 @@ As per VS 2013, MSBuild is be bundled with Visual Studio, not the .Net Framework
 See http://blogs.msdn.com/b/visualstudio/archive/2013/07/24/msbuild-is-now-part-of-visual-studio.aspx
 However the ToolLocationHelper class (to find it) has *also* moved into VS2013
 https://msdn.microsoft.com/en-us/library/microsoft.build.utilities.toollocationhelper(v=vs.121).aspx
+... so bit of a chicken-and-egg issue
 
 #>
 [CmdLetBinding()]

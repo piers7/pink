@@ -2,13 +2,24 @@
 param(
     $PackageStoreName = 'LocalNugetPackageStore',
     $version = "#.#.#.+1",
+    $outputFolder = ".\output",
     [switch]$inTeamCity = $(![String]::IsNullOrEmpty($env:TEAMCITY_VERSION))
 )
 
 $ErrorActionPreference = 'stop';
-$scriptDir = Split-Path $MyInvocation.MyCommand.Path;
+$scriptDir = Split-Path (Convert-Path $MyInvocation.MyCommand.Path);
 pushd $scriptDir;
 try{
+    Get-Module Pink-* | Remove-Module;
+
+    # Basic assemble module stages
+    .\Assemble-PsModule.ps1 .\build -outputFolder:$outputFolder;
+    Import-Module .\$outputFolder\Pink-Build.psm1 #-ErrorAction:stop;
+
+    # Smoke test the modules
+    Get-VSSolutionProjects -solution:.\Samples\VS2010\SamplesVS2010.sln;
+
+    return;
     #if($version){
     #    $version = .\Scripts\Update-VersionNumber.ps1 $version;
     #}
