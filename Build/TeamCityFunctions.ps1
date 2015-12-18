@@ -90,7 +90,7 @@ function Write-TeamCityBuildFailure($message){
     }
 }
 
-$parentInvocation = Get-Variable -Scope:1 -Name:MyInvocation -ValueOnly;
-if($parentInvocation.MyCommand -match 'Import-Module'){
+$parentInvocation = (Get-Variable -Scope:1 -Name:MyInvocation -ValueOnly);
+if($MyInvocation.MyCommand.Name.EndsWith('.psm1') -or $parentInvocation.MyCommand -match 'Import-Module'){
     Export-ModuleMember -Function:*-TeamCity*
 }

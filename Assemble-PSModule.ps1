@@ -26,6 +26,10 @@ dir $scriptFolder *.ps1 |
             }
             process {
                 $line = $_;
+                if($line.Contains('= Split-Path $MyInvocation.MyCommand.Path')){
+                    throw "$functionName - Can''t use MyInvocation.MyCommand.Path in a script module";
+                }
+
                 if(!$wroteHeader -and $line -match '\s*param\s*\('){
                     "function $functionName {"
                     $wroteHeader = $true;
@@ -45,3 +49,6 @@ dir $scriptFolder *.ps1 |
             }
         } | Out-File -Append -FilePath:$modulePath -Encoding:ASCII;
     }
+
+# return the FileInfo back to the caller
+Get-Item $modulePath;

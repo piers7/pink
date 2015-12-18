@@ -8,15 +8,32 @@ param(
 
 $ErrorActionPreference = 'stop';
 $scriptDir = Split-Path (Convert-Path $MyInvocation.MyCommand.Path);
+
+function AssembleModule{
+    param(
+        $moduleFolder,
+        $outputFolder
+    )
+    # Basic assemble module stages
+    $moduleFile = .\Assemble-PsModule.ps1 $moduleFolder -outputFolder:$outputFolder;
+    $module = Import-Module $moduleFile.FullName -PassThru #-ErrorAction:stop;
+
+    # Dump out what modules we built
+    $module | % {
+        Write-Host "Module $($_.Name) contains";
+        $_.ExportedCommands.Keys | % { "`t$_" };
+    }
+}
+
 pushd $scriptDir;
 try{
     Get-Module Pink-* | Remove-Module;
 
-    # Basic assemble module stages
-    .\Assemble-PsModule.ps1 .\build -outputFolder:$outputFolder;
-    Import-Module .\$outputFolder\Pink-Build.psm1 #-ErrorAction:stop;
+    AssembleModule .\build $outputFolder;
+    AssembleModule .\install\SSAS $outputFolder;
 
     # Smoke test the modules
+    Write-Host "Smoke Test Get-VSSolutionProjects";
     Get-VSSolutionProjects -solution:.\Samples\VS2010\SamplesVS2010.sln;
 
     return;
@@ -55,6 +72,8 @@ try{
             write-warning $_.Exception.GetBaseException().Message;
         }
         exit 1;
+    }else{
+        throw;
     }
 }finally{
     popd;

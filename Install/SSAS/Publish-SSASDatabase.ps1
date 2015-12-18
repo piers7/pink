@@ -26,7 +26,7 @@ param(
 )
 
 $erroractionpreference="stop"
-$scriptDir = Split-Path $MyInvocation.MyCommand.Path
+$scriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path $MyInvocation.MyCommand.Path };
 
 function ResolvePathyThings($path){
     if($path.GetType() -eq [System.Management.Automation.PathInfo]){
