@@ -6,20 +6,18 @@ It's easier to use OctoPack, but that doesn't support many BI project types
 [CmdLetBinding()]
 param(
     [Parameter(Mandatory=$true)]
-    $solutionDir,
-    [Parameter(Mandatory=$true)]
     $projectPath,
     [Parameter(Mandatory=$true)]
     $outputDir,
-
     [Parameter(Mandatory=$true)]
     $semVer,
 
-    $specPath
+    $nugetExe = '..\.nuget\nuget.exe',
+    $nuspec
 )
 
 $ErrorActionPreference = 'stop';
-$scriptDir = Split-Path (Convert-Path $MyInvocation.MyCommand.Path);
+
 
 function Add-ChildElement($parent, $name, [hashtable]$attributes){
     $child = $parent.OwnerDocument.CreateElement($name);
@@ -33,19 +31,18 @@ function Add-ChildElement($parent, $name, [hashtable]$attributes){
 # Packs a website using xcopy / Octopus Deploy conventions
 # For this we re-write the spec file on the fly to include project Content
 # if the Files element doesn't already exist
-function Pack-Website($projectPath, $specPath, [switch] $forceUseConventions, [switch] $ignoreWebTransforms){
+function Pack-Website($projectPath, $nuspec, [switch] $forceUseConventions, [switch] $ignoreWebTransforms){
     $projectName = $(Split-Path -Leaf $projectPath);
     $projectDir = Split-Path $projectPath;
 
     Write-Host "Packing $projectName as Website";
     $specXml = New-Object System.Xml.XmlDocument
-    $specXml.Load($specPath)
+    $specXml.Load($nuspec)
     $files = $specXml.SelectSingleNode("//files");
 
     if($files -and !$forceUseConventions){
         # just pack what's there
-        $baseDir = Split-Path $specPath;
-        PackInternal $specPath $outputDir $semVer $projectDir;
+        nuget-pack $nuspec $outputDir $semVer $projectDir;
         return;
     }elseif($files){
         $files.ParentNode.RemoveChild($files);
@@ -70,35 +67,48 @@ function Pack-Website($projectPath, $specPath, [switch] $forceUseConventions, [s
         [void]( Add-ChildElement $files 'file' @{ src="Web.*.config"; target=".\" } )
     }
 
-    $tempSpec = [io.Path]::ChangeExtension($specPath, '.generated.nuspec');
+    $tempSpec = [io.Path]::ChangeExtension($nuspec, '.generated.nuspec');
     $specXml.Save($tempSpec);
 
-    PackInternal $tempSpec $outputDir $semVer $projectDir;
+    nuget-pack $tempSpec $outputDir $semVer $projectDir;
 }
 
-function Pack-ProjectDefault($projectPath, $specPath){
+function Pack-ProjectDefault($projectPath, $nuspec){
     # Default behaviour is to just pack the spec as-is
     Write-Host "Packing $(Split-Path -Leaf $projectPath) as default";
-    $baseDir = Split-Path $specPath;
+    $baseDir = Split-Path $nuspec;
 
-    PackInternal $specPath $outputDir $semVer $baseDir;
+    nuget-pack $nuspec $outputDir $semVer $baseDir;
 }
 
-function PackInternal($specPath, $outputDir, $semVer, $baseDir){
-    & "$solutionDir\.nuget\nuget.exe" pack $specPath -o $outputDir -Version $semVer -basePath $baseDir -NoPackageAnalysis -NonInteractive
+
+function nuget-pack($nuspec, $outputDir, $semVer, $baseDir, [hashtable]$properties){
+    if($properties){
+        $propertiesString = ($properties.GetEnumerator() | % { '{0}={1}' -f $_.Key,$_.Value }) -join ';'
+    }else{
+        $propertiesString = "Foo=Bar"
+    }
+    & $nugetexe pack $nuspec -o $outputDir -Version $semVer -basePath $baseDir -NoPackageAnalysis -NonInteractive -Properties $propertiesString
     if($LASTEXITCODE -gt 0){
         throw "Failed with exit code $LASTEXITCODE";
     }
 }
 
 
-if(-not $specPath){
-    $specPath = [io.path]::ChangeExtension($projectPath, '.nuspec');
+$outputDir = (Resolve-Path $outputDir).Path;
+$projectPath = (Resolve-Path $projectPath).Path;
+$nugetExe = (Resolve-Path $nugetExe).Path;
+
+if(-not $nuspec){
+    $nuspec = [io.path]::ChangeExtension($projectPath, '.nuspec');
+    Write-Verbose "Inferring nuget spec through convention at '$nuspec'"
+}else{
+    $nuspec = (Resolve-Path $nuspec).Path;
 }
 
-$projectFolder = Split-Path $projectPath;
-if(Test-Path "$projectFolder\web.config"){
-    Pack-Website $projectPath $specPath;
+$projectDir = Split-Path $projectPath;
+if(Test-Path "$projectDir\web.config"){
+    Pack-Website $projectPath $nuspec;
 }else{
-    Pack-ProjectDefault $projectPath $specPath;
+    Pack-ProjectDefault $projectPath $nuspec;
 }
