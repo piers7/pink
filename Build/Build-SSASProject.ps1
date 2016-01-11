@@ -11,18 +11,26 @@ Thanks to DDarden; I was hoping it was wasn't that hard
 param(
     [Parameter(Mandatory=$true)]
     $projectPath,
-    [Parameter(Mandatory=$true)]
+    # [Parameter(Mandatory=$true)]
     $outputDir,
     $version = '11.0.0.0'
 )
 
 $ErrorActionPreference = 'stop';
-$asm = [Reflection.Assembly]::Load("Microsoft.AnalysisServices, Version=$version, Culture=neutral, PublicKeyToken=89845dcd8080cc91");
+try{
+    Add-Type -AssemblyName:"Microsoft.AnalysisServices, Version=$version, Culture=neutral, PublicKeyToken=89845dcd8080cc91" -ErrorAction:Stop;
+}catch{
+    Write-Warning "Failed to load SSAS assemblies - is AMO installed?"
+    throw;
+}
 
-$database = new-object Microsoft.AnalysisServices.Database
+$database = New-Object Microsoft.AnalysisServices.Database
 $projectPath = (Resolve-Path $projectPath).Path;
 $projectDir = Split-Path $projectPath -Parent;
 $projectName = [IO.Path]::GetFileNameWithoutExtension($projectPath);
+if(!$outputDir){
+    $outputDir = Join-Path $projectDir 'bin';
+}
 
 Write-Host "Building $projectPath to $outputDir"
 
@@ -63,6 +71,8 @@ DeserializeProjectItems '//MiningModels/ProjectItem/FullPath' 'Microsoft.Analysi
     [void] $database.MiningModels.Add($_);
 }
 DeserializeProjectItems '//Cubes/ProjectItem/FullPath' 'Microsoft.AnalysisServices.Cube' | % {
+    # NB: This implementation currently doesn't deserialize partitions created at design-time
+    # (I think that's an ok limitation for now)
     [void] $database.Cubes.Add($_);
 }
 
@@ -95,3 +105,15 @@ $writer = New-Object System.Xml.XmlTextWriter "$outputDir\$projectName.asdatabas
 $writer.Formatting = 'Indented';
 [Microsoft.AnalysisServices.Utils]::Serialize($writer, $database, $false);
 $writer.Close();
+
+# Also need to copy over 'Miscellaneous' project items into the output folder
+# (basically treat them as 'Content' items would be for normal msbuild projects)
+pushd $projectDir;
+try{
+    Select-Xml -Xml:$projectXml -XPath:'//Miscellaneous/ProjectItem' | % { 
+        $source = Resolve-Path $_.Node.FullPath; # might be relative to project    
+        Copy-Item $source $outputDir -Force -Verbose:($VerbosePreference -eq 'Continue');
+    }
+}finally{
+    popd;
+}
