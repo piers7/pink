@@ -1,15 +1,16 @@
+<#
+.synopsis
+Connects to an Analysis Services database using AMO
+#>
+[CmdLetBinding()]
 param(
-    [Parameter(Mandatory=$true)] $olapServer,
+    [Parameter(Mandatory=$true)] $serverInstance,
     [Parameter(Mandatory=$true)] $databaseName
 )
 
-@"
-Microsoft.AnalysisServices
-"@.Split([Environment]::NewLine) | ? { ($_ -ne '') -and (-not $_.StartsWith('#')) } | % { 
-	$asm = [reflection.assembly]::LoadWithPartialName($_)
-	if (-not $asm) { throw Error("Failed to load $_") }
+Add-Type -AssemblyName:"Microsoft.AnalysisServices, Version=11.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91";
+$srv = New-Object Microsoft.AnalysisServices.Server
+$srv.Connect($serverInstance)
+if($?){
+    $srv.Databases.GetByName($databaseName);
 }
-
-$srv = new-object Microsoft.AnalysisServices.Server
-$srv.Connect($olapServer)
-$srv.Databases.GetByName($databaseName);

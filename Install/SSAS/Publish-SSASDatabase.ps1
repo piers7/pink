@@ -12,7 +12,7 @@ this is typically via an installation of Visual Studio or BIDS.
 #>
 [CmdLetBinding()]
 param(
-    [Parameter(Mandatory=$true)] $server,
+    [Parameter(Mandatory=$true)] $serverInstance,
     [Parameter(Mandatory=$true)] $databaseName,
     [Parameter(Mandatory=$true)] $asdatabase,
     [hashtable]$connections = @{},
@@ -51,8 +51,8 @@ $asDeploy = Resolve-Path "$programfiles32\Microsoft SQL Server\$sqlVersion\Tools
 .synopsis
 Connects to an Analysis Services server using AMO
 #>
-[CmdLetBinding]
 function Get-SSASServer {
+    [CmdLetBinding()]
     param(
         [Parameter(Mandatory=$true)] $serverInstance
     )
@@ -100,7 +100,7 @@ function GenerateDeploymentXmla($asdatabase, $xmlaPath, $databaseName){
 
 pushd $scriptDir;
 try{
-    Write-Host "Deploy OLAP Database '$projectName' to $server as '$databaseName'"
+    Write-Host "Deploy OLAP Database '$projectName' to $serverInstance as '$databaseName'"
 
     # It's important we don't do the processing during deployment
     # as we (currently) don't update the datasources until *afterwards*
@@ -129,29 +129,29 @@ try{
     Write-Verbose "Generate XMLA from the .asdatabase file"
     GenerateDeploymentXmla $asdatabase $xmla -databaseName:$databaseName;
 
-    Write-Verbose "Determine if $databaseName already exists on $server"
-    $amoServer = Get-SSASServer $server;
+    Write-Verbose "Determine if $databaseName already exists on $serverInstance"
+    $amoServer = Get-SSASServer $serverInstance;
     $existing = $amoServer.Databases.FindByName($databaseName); # nb: not AMO 2005 compatable
     if($existing){
 	    if($clean){
             if($whatif){
                 Write-Host "WHATIF: Deployment will drop existing database '$databaseName'";
             }else{
-    		    Write-Warning "Dropping existing cube $server $databaseName";
+    		    Write-Warning "Dropping existing cube $serverInstance $databaseName";
     		    $existing.Drop();
             }
 	    }else{
-		    Write-Host "Target already exists: this will update $server $databaseName";
+		    Write-Host "Target already exists: this will update $serverInstance $databaseName";
 	    }
     }else{
-	    Write-Verbose "Target $server $databaseName not present - this will be a clean build";
+	    Write-Verbose "Target $serverInstance $databaseName not present - this will be a clean build";
     }
     
     if($whatif){
         return;
     }
 
-    Write-Verbose "Executing XMLA against $server to create $databaseName..."
+    Write-Verbose "Executing XMLA against $serverInstance to create $databaseName..."
     # No longer using ascmd as was a 2005 version
     # See http://msdn.microsoft.com/en-us/library/ms365187(v=sql.100).aspx
     $command = [io.file]::ReadAllText($xmla);
