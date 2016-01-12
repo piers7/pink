@@ -24,8 +24,8 @@ param(
 $programFiles32 = $env:ProgramFiles
 if (test-path environment::"ProgramFiles(x86)") { $programFiles32 = (gi "Env:ProgramFiles(x86)").Value };
 
-$erroractionpreference = "stop";
-$scriptDir = split-path $myinvocation.MyCommand.Path
+$ErrorActionPreference = "stop";
+# $scriptDir = if($PSScriptRoot) { $PSScriptRoot } else { Split-Path (Convert-Path $myinvocation.MyCommand.Path) };
 
 function EnsureWritable([io.fileinfo]$file){
     if(!$file.IsReadOnly) { return $true; }
@@ -58,14 +58,14 @@ function Set-AssemblyInfoVersion($file, $version)
 function ProcessItem($file, [scriptblock] $exec){
     if(!(EnsureWritable $file)){ return;}
 
-    write-verbose "Set version number in $file"
+    Write-Verbose "Set version number in $file"
     & $exec;
 }
 
 function ProcessXmlItem($file, [scriptblock] $exec){
     if(!(EnsureWritable $file)){ return;}
     
-    write-verbose "Set version number in $file"
+    Write-Verbose "Set version number in $file"
     $xml = new-object system.xml.xmldocument
     $xml.Load($file.FullName);
     & $exec $xml;
@@ -75,27 +75,40 @@ function ProcessXmlItem($file, [scriptblock] $exec){
 # Loop over all the files specified
 foreach($file in $files){
     if(!$file.Exists) { continue; }
-    switch($file.Extension){
-        ".nuspec" {
+    switch -Regex ($file.Name){
+        '\.nuspec$' {
+            # Update a version number in a nuspec
+            # Better to just use the -version command line parameter on nuget.exe in most cases
             ProcessXmlItem $file {
                 param($xml)
                 $xml.package.metadata.version = $version;
             }
             break;
         }
-        ".wxs" {
+        '\.wxs$' {
+            # Update a version number embedded in a Wix setup project
             ProcessXmlItem $file {
                 param($xml)
                 $xml.Wix.Product.Version = $version;
             }
             break;    
         }
-        default {
-            if($file.Name -like 'Assembly*Info.cs'){
-                ProcessItem $file {
-                    Set-AssemblyInfoVersion $file $version;
+        '\.psd1$' {
+            # Update a version number in a PowerShell manifest
+            ProcessItem $file {
+                $contents = Get-Content $file | % { 
+                    $_ -replace "ModuleVersion\s*=\s*'[\d\.]+'","ModuleVersion = '$version'"
                 }
+                Set-Content -Value:$contents -Path:$file;
             }
+        }
+        'Assembly\w*Info.cs$' {
+            ProcessItem $file {
+                Set-AssemblyInfoVersion $file $version;
+            }
+        }
+        default {
+            Write-Verbose "Ignoring $_ as no handler setup for that file type";
         }
     }
 }

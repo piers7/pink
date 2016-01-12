@@ -1,10 +1,9 @@
-﻿param(
+param(
     [Parameter(Mandatory=$true)] $project,
     [string]$xpath = "//ProjectItem"
 )
 
 $ErrorActionPreference = 'stop';
-$scriptDir = split-path $MyInvocation.MyCommand.Path
 
 $projXml = new-object system.xml.xmldocument
 $projXml.Load($project);
