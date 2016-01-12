@@ -1,4 +1,4 @@
-﻿<#
+<#
 .Synopsis
 Builds a .dwproj into an .asdatabase
 

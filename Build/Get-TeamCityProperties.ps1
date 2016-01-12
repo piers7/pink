@@ -1,4 +1,4 @@
-﻿<#
+<#
 .Synopsis
 Returns a hashtable of TeamCity system build properties for the current build,
 or an empty hashtable if not running under TeamCity

@@ -1,4 +1,4 @@
-﻿<#
+<#
 .synopsis
 Packs a SSRS project using xcopy / Octopus Deploy conventions
 #>

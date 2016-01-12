@@ -55,6 +55,7 @@ try{
     # Find (script) module manifests to locate modules and build
     foreach($manifest in Get-ChildItem -Directory -Exclude:output | % { Get-ChildItem $_ *.psd1 -Recurse }){
         AssembleModule $manifest.FullName $outputFolder -version:$version;
+        Write-Host
     }
     # AssembleModule .\build $outputFolder -version:$version;
     # AssembleModule .\install\SSAS $outputFolder -version:$version;
@@ -90,14 +91,14 @@ try{
     }
     #>
     if($version){
-        Set-Content -Value:$version -Path:Version.txt;
+        Set-Content -Value:$version -Path:Version.txt -Encoding:ASCII;
     }
 
 }catch{
     if($inTeamCity){
         Write-Warning $_;
         if($_.Exception){
-            write-warning $_.Exception.GetBaseException().Message;
+            Write-Warning $_.Exception.GetBaseException().Message;
         }
         exit 1;
     }else{

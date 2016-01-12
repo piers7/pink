@@ -1,4 +1,4 @@
-﻿param(
+param(
     [Parameter(Mandatory=$true)] $project,
     [string]$xpath = "//ProjectItem"
 )

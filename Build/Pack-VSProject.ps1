@@ -1,4 +1,4 @@
-﻿<#
+<#
 .synopsis
 Allows a Visual Studio Project to be packed using xcopy / Octopus Deploy conventions
 It's easier to use OctoPack, but that doesn't support many BI project types

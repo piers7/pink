@@ -1,4 +1,4 @@
-﻿<#
+<#
 .synopsis
 A series of utility functions for writing TeamCity Service Messages
 This script should be dot-sourced into the caller's scope

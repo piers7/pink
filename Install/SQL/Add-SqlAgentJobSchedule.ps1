@@ -1,4 +1,4 @@
-﻿param
+param
 (    
     [Parameter(Mandatory=$true)] [Microsoft.SqlServer.Management.Smo.Agent.Job] $job, 
     [TimeSpan] $frequency,
