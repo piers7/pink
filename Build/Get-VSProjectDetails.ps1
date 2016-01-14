@@ -1,9 +1,13 @@
 <#
-.Synopsis
+.synopsis
+Get Visual Studio project metadata from one or more project files
+
+.description
 Takes an input stream of FileInfo's and returns a custom object with project metadata
 Use this to easily extract lists of projects by version etc...
 .Example
 .\Get-VSProjectDetails.ps1 | ? { $_.TargetFrameworkVersion -ne 'v3.5' }
+
 #>
 param(
     $buildConfig = 'Debug',

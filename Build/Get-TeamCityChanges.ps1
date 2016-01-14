@@ -1,7 +1,6 @@
 <#
 .synopsis
-Extracts checkin comments from TeamCity's REST api for a particular build (normally the current one)
-PW 2015
+Extracts checkin comments from TeamCity's REST api for a build
 #>
 [CmdLetBinding()]
 param(

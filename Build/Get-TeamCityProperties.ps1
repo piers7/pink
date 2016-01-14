@@ -1,7 +1,11 @@
 <#
-.Synopsis
-Returns a hashtable of TeamCity system build properties for the current build,
-or an empty hashtable if not running under TeamCity
+.synopsis
+Returns a hashtable of TeamCity system build properties for the current build
+
+.description
+Grabs build properties from the file specified by %TEAMCITY_BUILD_PROPERTIES_FILE%,
+and returns them as a hashtable.
+If not running under TeamCity an empty hashtable is returned.
 #>
 [CmdLetBinding()]
 param(

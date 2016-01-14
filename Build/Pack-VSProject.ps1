@@ -1,6 +1,8 @@
 <#
 .synopsis
-Allows a Visual Studio Project to be packed using xcopy / Octopus Deploy conventions
+Packs a Visual Studio Project to a xcopy / Octopus Deploy style nuget
+
+.description
 It's easier to use OctoPack, but that doesn't support many BI project types
 #>
 [CmdLetBinding()]

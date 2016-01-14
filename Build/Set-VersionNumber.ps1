@@ -1,12 +1,14 @@
 <#
-.Synopsis
-Stamps the version number into the input files suppled on the pipeline.
+.synopsis
+Stamps a version number into the input files suppled on the pipeline.
+
+.description
 The version number is stamped in in different ways depending on the file type
 (wix, nuspec, assemblyinfo etc...)
 Since System.Version can't handle wildcards, no validation on the version string
 is performed. It is your responsibility to provide a valid version string for the file types provided.
-Read-only files are ignored, unless force is specified.
-If operating under TFS, check the files out first
+
+Read-only files are ignored, unless force is specified. If operating under TFS, check the files out first
 #>
 param(
     [Parameter(Mandatory=$true)] [string]

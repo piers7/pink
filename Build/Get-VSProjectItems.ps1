@@ -1,3 +1,10 @@
+<#
+.synopsis
+Enumerates the items within a Visual Studio project file, and provides their full path
+
+.description
+TODO: Not sure why this isn't using Select-Xml
+#> 
 param(
     [Parameter(Mandatory=$true)] $project,
     [string]$xpath = "//ProjectItem"
