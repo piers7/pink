@@ -26,7 +26,12 @@ function AssembleModule{
 
     $module | % {
         Write-Host "Module $($_.Name) contains";
-        $_.ExportedCommands.Keys | % { "`t$_" };
+        $_.ExportedCommands.Keys | % { 
+            $commandName = $_;
+            $help = Get-Help $commandName;
+            $description = if ($help.synopsis -and $help.synopsis[0] -ne "`r") { $help.synopsis} else { "" };
+            "`t{0} ({1})" -f $commandName,$description; 
+        };
     }
 }
 
