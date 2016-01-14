@@ -42,6 +42,7 @@ dir $manifestDirectory *.ps1 |
                 $functionName = $_.BaseName; # file name without extension
                 $wroteHeader = $false;
                 "# begin $file"
+                "" # Extra line break between comment above and functions is critical, or help doesn't work properly
             }
             process {
                 $line = $_;
