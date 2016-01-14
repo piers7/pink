@@ -178,6 +178,33 @@ try{
         }
     }
 
+    if($roleMemberships){
+        Write-Verbose "Updating role memberships";
+        foreach($item in $roleMemberships.GetEnumerator()){
+            $roleName = $item.Key;
+            $logins = @($item.Value);
+
+            Write-Verbose "Locating role '$roleName'"
+            $roleObj = $db.Roles.FindByName($roleName);
+            if($roleObj -eq $null){
+                Write-Warning "Skipping adding members for missing role '$roleName'";
+                continue;
+            }
+            $target = "{0}.{1}" -f $roleObj.Parent.Parent,$roleObj.Parent;
+
+            foreach($login in $logins){
+                $existingMember = @($roleObj.Members | ? { $_.Name -eq $login })
+                if ($existingMember){
+                    Write-Verbose "$login already member of '$roleName' on $target";
+                }else{
+                    Write-Host "[SSAS:$target] Grant '$roleName' access to '$login'"
+                    [void] $roleObj.Members.Add($login);
+                    [void] $roleObj.Update();
+                }
+            }
+        }
+    }
+
     Write-Verbose "Update the version/description on published database as appropriate"
     if($version){
         Write-Host "Stamping the version number as $version";
