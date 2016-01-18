@@ -1,7 +1,9 @@
 [CmdLetBinding()]
 param(
-    $PackageStoreName = 'LocalNugetPackageStore',
-    $version = "#.#.#.+1",
+    $version,
+    $versionNumberFormat,
+    $versionSuffix = '',
+
     $outputDir = ".\output",
     $nugetExe = '.nuget\nuget.exe',
 	[scriptblock] $versionNumberCallback
@@ -77,18 +79,27 @@ try{
         Remove-Item $outputDir -Recurse;
     }
 
-    if($version){
-        $oldVersion = Get-Content Version.txt;
-        $version = .\build\Update-VersionNumber.ps1 $oldVersion -versionNumberPattern:$version;
-        if($versionNumberCallback){ & $versionNumberCallback $version; }
+    # Basic version number rolling behaviour
+    if(!$version){
+        # load version from file if not explicitly specified
+        $version = Get-Content Version.txt
+    }
+    if($versionNumberFormat){
+        # if required, roll version number based on format
+        $version = .\build\Update-VersionNumber.ps1 $version -versionNumberPattern:$versionNumberFormat;
+    }
+    $semVer = ($version -split '\.',4)[0..2] -join '.';
+    if($versionSuffix){
+        $semVer += '-' + $versionSuffix;
     }
 
-    Write-Header "Building pink v$version";
     # Find (script) module manifests to locate modules and build
+    Write-Header "Building pink v$version ($semVer)";
     foreach($manifest in Get-ChildItem -Directory -Exclude:output | % { Get-ChildItem $_ *.psd1 -Recurse }){
         AssembleModule $manifest.FullName $outputDir -version:$version;
         Write-Host
     }
+
 
     # Smoke test the modules
     Write-Header Smoke tests
@@ -96,18 +107,17 @@ try{
     $projects = @(Get-VSSolutionProjects -solution:.\Samples\VS2010\SamplesVS2010.sln);
     Assert ($projects.Length -eq 1) -successMessage:Ok;
 
+
     # Package up everything into nuget
     Write-Header Packing
-    Write-Host "Packaging Package\Pink.nuspec to $outDir"
-    & $nugetexe pack Package\Pink.nuspec -outputdirectory $outputDir -version $version;
+    Write-Host "Packaging Package\Pink.nuspec v$semVer to $outputDir"
+    & $nugetexe pack Package\Pink.nuspec -outputdirectory $outputDir -version $semVer;
     if(!$?){ 
         Write-Error "Nuget.exe failed with $LASTEXITCODE"
         exit $LASTEXITCODE 
     }
 
-    if($version){
-        Set-Content -Value:$version -Path:Version.txt -Encoding:ASCII -Force;
-    }
+    Set-Content -Value:$version -Path:Version.txt -Encoding:ASCII -Force;
 
 }finally{
     popd;

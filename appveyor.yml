@@ -1,14 +1,18 @@
 version: 1.0.{build}
 
 init:
+  - ps: |
+    $version = Get-Content Version.txt;
+    $version = .\build\Update-VersionNumber.ps1 $version -versionNumberPattern:"#.#.$($env:APPVEYOR_BUILD_NUMBER).0"
+    Update-AppveyorBuild -Version $version;
 
 build_script:
-- ps: .\build.ps1 -version:"#.#.$($env:APPVEYOR_BUILD_NUMBER).0" -versionNumberCallback:{ Update-AppveyorBuild -Version $args[0] };
+  - ps: .\build.ps1 -version:($env:APPVEYOR_BUILD_VERSION) -versionSuffix:"$($env:APPVEYOR_REPO_BRANCH)-$($env:APPVEYOR_REPO_COMMIT)";
 
 artifacts:
-- path: .\output\Pink-Build.*
-  name: Pink-Build
-- path: .\output\Pink-SSAS.*
-  name: Pink-SSAS
-- path: .\output\Pink.*.nupkg
-  name: Pink
+  - path: .\output\Pink-Build.*
+    name: Pink-Build
+  - path: .\output\Pink-SSAS.*
+    name: Pink-SSAS
+  - path: .\output\Pink.*.nupkg
+    name: Pink
