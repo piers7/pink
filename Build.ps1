@@ -2,8 +2,9 @@
 param(
     $PackageStoreName = 'LocalNugetPackageStore',
     $version = "#.#.#.+1",
-    $outputFolder = ".\output",
-    [switch]$inTeamCity = $(![String]::IsNullOrEmpty($env:TEAMCITY_VERSION))
+    $outputDir = ".\output",
+    $nugetExe = '.nuget\nuget.exe',
+	[scriptblock] $versionNumberCallback
 )
 
 $ErrorActionPreference = 'stop';
@@ -12,11 +13,11 @@ $scriptDir = Split-Path (Convert-Path $MyInvocation.MyCommand.Path);
 function AssembleModule{
     param(
         $manifestPath,
-        $outputFolder,
+        $outputDir,
         $version
     )
     # Basic assemble module stages
-    $modulePath = .\Assemble-PsModule.ps1 $manifestPath -outputFolder:$outputFolder -version:$version;
+    $modulePath = .\Assemble-PsModule.ps1 $manifestPath -outputDir:$outputDir -version:$version;
 
     # Load the resulting module (check it basically works)
     # ...and dump what we exported
@@ -49,66 +50,65 @@ function Assert(
     }
 }
 
+function Write-Header(){
+    Write-Host
+    Write-Host $args -ForegroundColor:Cyan
+    Write-Host ********
+}
+
+# Check we have nuget.exe, if not download
+if(!(Test-Path $nugetExe)){
+    Write-Heade "Downloading nuget.exe..."
+    $nugetDir = Split-Path -Parent $nugetExe;
+    if(!(Test-Path $nugetDir)){
+        [void] (mkdir $nugetDir);
+    }
+    Write-Host "Downloading nuget.exe..."
+    $client = new-object net.webclient
+    $client.DownloadFile('https://dist.nuget.org/win-x86-commandline/latest/nuget.exe', $nugetExe);
+}
+$nugetExe = (Resolve-Path $nugetExe).Path;
+
 Get-Module Pink-* | Remove-Module;
 pushd $scriptDir;
 try{
+    # Clear down the output directory first
+    if(Test-Path $outputDir){
+        Remove-Item $outputDir -Recurse;
+    }
+
     if($version){
         $oldVersion = Get-Content Version.txt;
         $version = .\build\Update-VersionNumber.ps1 $oldVersion -versionNumberPattern:$version;
+        if($versionNumberCallback){ & $versionNumberCallback $version; }
     }
 
+    Write-Header "Building pink v$version";
     # Find (script) module manifests to locate modules and build
     foreach($manifest in Get-ChildItem -Directory -Exclude:output | % { Get-ChildItem $_ *.psd1 -Recurse }){
-        AssembleModule $manifest.FullName $outputFolder -version:$version;
+        AssembleModule $manifest.FullName $outputDir -version:$version;
         Write-Host
     }
-    # AssembleModule .\build $outputFolder -version:$version;
-    # AssembleModule .\install\SSAS $outputFolder -version:$version;
 
     # Smoke test the modules
+    Write-Header Smoke tests
     Write-Host "Smoke Test Get-VSSolutionProjects";
     $projects = @(Get-VSSolutionProjects -solution:.\Samples\VS2010\SamplesVS2010.sln);
     Assert ($projects.Length -eq 1) -successMessage:Ok;
 
-    #dir $scriptDir *.nuspec -Recurse | .\Scripts\Set-VersionNumber.ps1 -version:$version;
-    #$version | Out-File .\Version.txt -Force;
-
-    <#
-    $outDir = Join-Path ([IO.Path]::GetPathRoot($scriptDir)) $packageStoreName;
-    if(!(Test-Path $outDir)){
-        $void = mkdir $outDir;
-    }
-    Write-Verbose "Packaging Package\Pink.nuspec to $outDir"
-    nuget.exe pack Package\Pink.nuspec -outputdirectory $outDir
-
+    # Package up everything into nuget
+    Write-Header Packing
+    Write-Host "Packaging Package\Pink.nuspec to $outDir"
+    & $nugetexe pack Package\Pink.nuspec -outputdirectory $outputDir -version $version;
     if(!$?){ 
         Write-Error "Nuget.exe failed with $LASTEXITCODE"
         exit $LASTEXITCODE 
     }
 
-    $msbuild = .\Scripts\Get-MsBuildPath.ps1
-    dir $scriptDir\Samples *.sln -Recurse | % { 
-        & $msbuild $_.FullName;
-        if(!$?){ 
-            Write-Error "msbuild.exe failed with $LASTEXITCODE"
-            exit $LASTEXITCODE 
-        }
-    }
-    #>
     if($version){
-        Set-Content -Value:$version -Path:Version.txt -Encoding:ASCII;
+        Set-Content -Value:$version -Path:Version.txt -Encoding:ASCII -Force;
     }
 
-}catch{
-    if($inTeamCity){
-        Write-Warning $_;
-        if($_.Exception){
-            Write-Warning $_.Exception.GetBaseException().Message;
-        }
-        exit 1;
-    }else{
-        throw;
-    }
 }finally{
     popd;
 }

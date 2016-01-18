@@ -2,7 +2,7 @@
 <package>
   <metadata>
     <id>Pink</id>
-    <version>1.0.16.0</version>
+    <version>$version$</version>
     <authors>Piers Williams</authors>
     <owners>Piers Williams</owners>
     <!--
@@ -10,15 +10,16 @@
     <projectUrl>http://PROJECT_URL_HERE_OR_DELETE_THIS_LINE</projectUrl>
     <iconUrl>http://ICON_URL_HERE_OR_DELETE_THIS_LINE</iconUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
--->
+	-->
     <description>The PowerShell Install Kit - Helps you install your software using PowerShell</description>
     <releaseNotes>
     </releaseNotes>
-    <copyright>Copyright 2012</copyright>
+    <copyright>Copyright Piers Williams 2012-2016</copyright>
   </metadata>
   <files>
-    <file src="Tools\**\*" target="Tools" />
+    <!--<file src="Tools\**\*" target="Tools" />-->
     <!--<file src="Content\**\*" target="Content" />-->
-    <file src="SolutionContent\**\*" target="SolutionContent" />
+    <!--<file src="SolutionContent\**\*" target="SolutionContent" />-->
+	<file src="..\output\Pink-*.ps*1" target="Tools"/>
   </files>
 </package>

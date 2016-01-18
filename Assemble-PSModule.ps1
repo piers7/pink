@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory=$true)] $manifestPath,
-    $outputFolder = '.\output',
+    $outputDir = '.\output',
     $modulePrefix,
     $version,
     [switch]$noExports
@@ -8,25 +8,25 @@ param(
 
 $scriptDir = Split-Path (Convert-Path $MyInvocation.MyCommand.Path);
 
-if(!(Test-Path $outputFolder)){
-    [void] (mkdir $outputFolder);
+if(!(Test-Path $outputDir)){
+    [void] (mkdir $outputDir);
 }
 [void] (Resolve-Path $manifestPath);
 
 $manifestDirectory = Split-Path $manifestPath;
 $moduleName = [IO.Path]::GetFileNameWithoutExtension($manifestPath);
-$modulePath = Join-Path $outputFolder "$moduleName.psm1"
+$modulePath = Join-Path $outputDir "$moduleName.psm1"
 if($modulePrefix){
     $modulePrefix = $moduleName -split '-' | Select-Object -Last:1;
 }
 
-$manifestTargetPath = Join-Path $outputFolder (Split-Path -Leaf $manifestPath);
+$manifestTargetPath = Join-Path $outputDir (Split-Path -Leaf $manifestPath);
 
 Write-Host "Assembling $modulePath"
 "" | Set-Content $modulePath
 
 # Include the manifest (with updated version number if required)
-Copy-Item $manifestPath $outputFolder -Force;
+Copy-Item $manifestPath $outputDir -Force;
 if($version){
     Get-Item $manifestTargetPath | & $scriptDir\build\Set-VersionNumber.ps1 $version
 }

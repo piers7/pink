@@ -1,10 +1,14 @@
 version: 1.0.{build}
 
+init:
+
 build_script:
-- ps: .\build.ps1
+- ps: .\build.ps1 -version:"#.#.$($env:APPVEYOR_BUILD_NUMBER).0" -versionNumberCallback:{ Update-AppveyorBuild -Version $args[0] };
 
 artifacts:
 - path: .\output\Pink-Build.*
   name: Pink-Build
 - path: .\output\Pink-SSAS.*
   name: Pink-SSAS
+- path: .\output\Pink.*.nupkg
+  name: Pink
