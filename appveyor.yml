@@ -1,6 +1,7 @@
 version: 1.0.{build}
 
-init:
+# Version number handling must be done in install (after repo clone, before assembly patching)
+install:
   - ps: >-
       $version = Get-Content Version.txt;
       $version = .\build\Update-VersionNumber.ps1 $version -versionNumberPattern:"#.#.$($env:APPVEYOR_BUILD_NUMBER).0"
