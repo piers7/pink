@@ -4,7 +4,7 @@ version: 1.0.{build}
 install:
   - ps: >-
       $version = Get-Content Version.txt;
-      $version = .\build\Update-VersionNumber.ps1 $version -versionNumberPattern:"#.#.$($env:APPVEYOR_BUILD_NUMBER).0"
+      $version = .\build\Update-VersionNumber.ps1 $version -versionNumberPattern:"#.#.$($env:APPVEYOR_BUILD_NUMBER).0";
       Update-AppveyorBuild -Version $version;
 
 build_script:
