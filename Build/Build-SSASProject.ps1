@@ -3,9 +3,12 @@
 Builds a .dwproj into an .asdatabase
 
 .Description
+Builds a Visual Studio / BIDS Analysis Services project into a .asdatabase file,
+as would happen in devenv during build time.
+
 Based on SSASHelper code lifted from Analysis Services project on codeplex
 http://sqlsrvanalysissrvcs.codeplex.com/SourceControl/latest#SsasHelper/SsasHelper/ProjectHelper.cs
-Thanks to DDarden; I was hoping it was wasn't that hard
+Thanks DDarden - I was hoping it was wasn't that hard
 #>
 [CmdLetBinding()]
 param(
@@ -22,6 +25,10 @@ try{
 }catch{
     Write-Warning "Failed to load SSAS assemblies - is AMO installed?"
     throw;
+}
+
+$ns = @{
+    AS = 'http://schemas.microsoft.com/analysisservices/2003/engine';
 }
 
 $database = New-Object Microsoft.AnalysisServices.Database
@@ -42,9 +49,17 @@ function DeserializeProjectItems($xpath, $objectType){
     Write-Verbose "Deserialise $objectType";
     Select-Xml -Xml:$projectXml -XPath:$xpath | % {
         $path = Join-Path $projectDir $_.Node.InnerText;
-        $reader = New-Object System.Xml.XmlTextReader $path;
+        DeserializePathAs $path $objectType; # returns item to pipeline
+    }
+}
+
+function DeserializePathAs($path, $objectType){
+    $reader = New-Object System.Xml.XmlTextReader $path;
+    try{
         $majorObject = New-Object $objectType;
         [Microsoft.AnalysisServices.Utils]::Deserialize($reader, $majorObject); # returns item to pipeline
+    }finally{
+        $reader.Close();
     }
 }
 
@@ -70,30 +85,48 @@ DeserializeProjectItems '//Dimensions/ProjectItem/FullPath' 'Microsoft.AnalysisS
 DeserializeProjectItems '//MiningModels/ProjectItem/FullPath' 'Microsoft.AnalysisServices.MiningModel' | % {
     [void] $database.MiningModels.Add($_);
 }
-DeserializeProjectItems '//Cubes/ProjectItem/FullPath' 'Microsoft.AnalysisServices.Cube' | % {
-    # NB: This implementation currently doesn't deserialize partitions created at design-time
-    # (I think that's an ok limitation for now)
-    [void] $database.Cubes.Add($_);
-}
 
-<#
-# Deserializing cubes is a bit funky
-# again, I've just cribbed this off of DDarden's code
+# When deserializing cube we need to account for dependencies (partitions)
+# This is cribbed this off of DDarden's code on codeplex
 Write-Verbose "Deserialise Microsoft.AnalysisServices.Cube";
 Select-Xml -Xml:$projectXml -XPath:'//Cubes/ProjectItem/FullPath' | % {
     $path = Join-Path $projectDir $_.Node.InnerText;
-    $reader = New-Object System.Xml.XmlTextReader $path
-    $cube = [Microsoft.AnalysisServices.Utils]::Deserialize($reader, (New-Object Microsoft.AnalysisServices.Cube));
+
+    $cube = DeserializePathAs $path 'Microsoft.AnalysisServices.Cube';
     [void] $database.Cubes.Add($cube);
 
     $dependencies = $_.Node.SelectNodes('../Dependencies/ProjectItem/FullPath');
     foreach($dependency in $dependencies){
         $path = Join-Path $projectDir $dependency.InnerText;
+        $partitionXml = (Select-Xml -Path:$path -XPath:/).Node;
 
-        # todo: some more bits here to bring in the partitions etc...
+        # .partitions file as loaded doesn't have 'Name' node populated for MeasureGroup
+        # need to fix that for deserialization to work
+        # NB: don't think we care what name we use, so just use ID
+        Select-Xml -Xml:$partitionXml -XPath://AS:MeasureGroup/AS:ID -Namespace:$ns |
+            % { 
+                $idNode = $_.Node;
+                $nameNode = $idNode.ParentNode.ChildNodes | ? { $_.Name -eq 'Name' } | Select-Object -First:1;
+                if(!$nameNode){
+                    $nameNode = $idNode.OwnerDocument.CreateElement('Name', $ns.AS);
+                    $nameNode.InnerText = $idNode.InnerText;
+                    [void] $idNode.ParentNode.InsertAfter($nameNode, $idNode);
+                }
+            }
+
+        # now we can deserialise this 'cube'
+        $reader = New-Object System.Xml.XmlNodeReader $partitionXml;
+        $tempCube = New-Object 'Microsoft.AnalysisServices.Cube';
+        $tempCube = [Microsoft.AnalysisServices.Utils]::Deserialize($reader, $tempCube);
+
+        # ..and then copy the partitions from this 'cube' into the original cube
+        foreach($tempMeasureGroup in $tempCube.MeasureGroups){
+            $measureGroup = $cube.MeasureGroups.Find($tempMeasureGroup.ID);
+            $tempPartitions = @($tempMeasureGroup.Partitions);
+            $tempPartitions | % { [void] $measureGroup.Partitions.Add($_) };
+        }
     }
 }
-#>
 
 # finally, spit out the output .asdatabase etc...
 if(!(Test-Path $outputDir)){
