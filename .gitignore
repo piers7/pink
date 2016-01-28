@@ -3,6 +3,7 @@ output/
 # Build Folders (you can keep bin if you'd like, to store dlls and pdbs)
 [Bb]in/
 [Oo]bj/
+temp/
 
 # mstest test results
 TestResults
