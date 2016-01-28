@@ -8,7 +8,7 @@ install:
       Update-AppveyorBuild -Version $version;
 
 build_script:
-  - ps: .\build.ps1 -version:($env:APPVEYOR_BUILD_VERSION) -versionSuffix:"$($env:APPVEYOR_REPO_BRANCH)-$($env:APPVEYOR_REPO_COMMIT)";
+  - ps: .\build.ps1 -version:($env:APPVEYOR_BUILD_VERSION) -versionSuffix:"$($env:APPVEYOR_REPO_BRANCH)";
 
 artifacts:
   - path: .\output\Pink-Build.*
