@@ -21,14 +21,15 @@ function TeamCity-Escape([string]$message){
 }
 
 function Start-TeamCityBlock($taskName){
-    if($inTeamCity){
+    if($env:TEAMCITY_VERSION){
         Write-Host "##teamcity[blockOpened name='$taskName']";
     }else{
         Write-Host "$taskName start";
     }
 }
+
 function End-TeamCityBlock($taskName){
-    if($inTeamCity){
+    if($env:TEAMCITY_VERSION){
         Write-Host "##teamcity[blockClosed name='$taskName']";
     }else{
         Write-Host "$taskName end";
@@ -37,23 +38,25 @@ function End-TeamCityBlock($taskName){
 }
 
 function Write-TeamCityProgress($message){
-    if($inTeamCity){
+    if($env:TEAMCITY_VERSION){
         $message = TeamCity-Escape $message;
         Write-Host "##teamcity[progressMessage '$message']";
     }else{
         Write-Host $message -ForegroundColor:Yellow;
     }
 }
+
 function Start-TeamCityProgress($message){
-    if($inTeamCity){
+    if($env:TEAMCITY_VERSION){
         $message = TeamCity-Escape $message;
         Write-Host "##teamcity[progressStart '$message']";
     }else{
         Write-Host $message;
     }
 }
+
 function End-TeamCityProgress($message){
-    if($inTeamCity){
+    if($env:TEAMCITY_VERSION){
         $message = TeamCity-Escape $message;
         Write-Host "##teamcity[progressFinish '$message']";
     }else{
@@ -72,7 +75,7 @@ function Set-TeamCityStatistic($name, $value){
 
 function Write-TeamCityBuildError($message){
     $fullMessage = $message -f $args;
-    if($inTeamCity){
+    if($env:TEAMCITY_VERSION){
         $fullMessage = TeamCity-Escape $fullMessage;
         Write-Host "##teamcity[message status='ERROR' text='$fullMessage']";
     }else{
@@ -82,7 +85,7 @@ function Write-TeamCityBuildError($message){
 
 function Write-TeamCityBuildFailure($message){
     $fullMessage = $message -f $args;
-    if($inTeamCity){
+    if($env:TEAMCITY_VERSION){
         $fullMessage = TeamCity-Escape $fullMessage;
         Write-Host "##teamcity[buildStatus status='FAILURE' text='{build.status.text} $fullMessage']";
     }else{
